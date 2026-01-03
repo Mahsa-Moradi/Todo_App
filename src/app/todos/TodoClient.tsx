@@ -1,6 +1,11 @@
+// src/app/todos/TodoClient.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import AddTodoBar from "./components/AddTodoBar";
+import EmptyState from "./components/EmptyState";
+import FilterTabs, { Filter } from "./components/FilterTabs";
+import TodoItem from "./components/TodoItem";
 
 type Todo = {
   id: string;
@@ -13,13 +18,20 @@ export default function TodoClient() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     fetch("/api/todos")
       .then((r) => r.json())
-      .then((data) => setTodos(data))
+      .then((data: Todo[]) => setTodos(data))
       .finally(() => setLoading(false));
   }, []);
+
+  const visibleTodos = useMemo(() => {
+    if (filter === "active") return todos.filter((t) => !t.done);
+    if (filter === "done") return todos.filter((t) => t.done);
+    return todos;
+  }, [todos, filter]);
 
   async function addTodo(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,56 +65,35 @@ export default function TodoClient() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   }
 
-  if (loading) return <p>Loading...</p>;
-
   return (
-    <section>
-      <form onSubmit={addTodo} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a new todo..."
-          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-        />
-        <button type="submit" style={{ padding: "10px 16px", borderRadius: 10 }}>
-          Add
-        </button>
-      </form>
+    <>
+      <div className="header">
+        <div className="h1">TODO APP</div>
+        <div className="count">{todos.length} tasks</div>
+      </div>
 
-      {todos.length === 0 ? (
-        <p>No tasks yet. Add some!</p>
+      <AddTodoBar title={title} setTitle={setTitle} onSubmit={addTodo} />
+
+      <FilterTabs value={filter} onChange={setFilter} />
+
+      <div className="hr" />
+
+      {loading ? (
+        <div style={{ color: "rgba(255,255,255,.6)" }}>Loading...</div>
+      ) : visibleTodos.length === 0 ? (
+        <EmptyState />
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {todos.map((t) => (
-            <li
+        <ul className="list">
+          {visibleTodos.map((t) => (
+            <TodoItem
               key={t.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 0",
-                borderBottom: "1px solid #eee",
-              }}
-            >
-              <span
-                onClick={() => toggleDone(t)}
-                style={{
-                  cursor: "pointer",
-                  textDecoration: t.done ? "line-through" : "none",
-                }}
-                title="Toggle done"
-              >
-                {t.title}
-              </span>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => toggleDone(t)}>{t.done ? "Undo" : "Done"}</button>
-                <button onClick={() => removeTodo(t.id)}>Delete</button>
-              </div>
-            </li>
+              todo={t}
+              onToggle={() => toggleDone(t)}
+              onDelete={() => removeTodo(t.id)}
+            />
           ))}
         </ul>
       )}
-    </section>
+    </>
   );
 }
